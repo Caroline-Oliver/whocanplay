@@ -3,15 +3,16 @@ package com.example.whocanplay;
 import java.util.Map;
 
 public class Game {
-    private String name,graphics,directX,processor,description,percent;
+    private String name,graphics,directX,processor,description,percent,imageURL;
 
-    public Game(String name, String graphics, String directX,String processor,String description,String percent){
+    public Game(String name, String graphics, String directX,String processor,String description,String percent,String imageURL){
         this.setName(name);
         this.setGraphics(graphics);
         this.setDirectX(directX);
         this.setProcessor(processor);
         this.setDescription(description);
         this.setPercent(percent);
+        this.setImageURL(imageURL);
     }
 
     public String getName() {
@@ -62,21 +63,36 @@ public class Game {
         this.percent = percent;
     }
 
+    public String getImageURL() {
+        return imageURL;
+    }
+
+    public void setImageURL(String imageURL) {
+        this.imageURL = imageURL;
+    }
+
     @Override
     public String toString() {
         return "Game{" +
-                "name='" + getName() + '\'' +
-                ", graphics='" + getGraphics() + '\'' +
-                ", directX='" + getDirectX() + '\'' +
-                ", processor='" + getProcessor() + '\'' +
+                "name='" + name + '\'' +
+                ", graphics='" + graphics + '\'' +
+                ", directX='" + directX + '\'' +
+                ", processor='" + processor + '\'' +
+                ", description='" + description + '\'' +
+                ", percent='" + percent + '\'' +
+                ", imageURL='" + imageURL + '\'' +
                 '}';
     }
+
     public Map<String,String> getGameData(){
         return Map.of(
                 "name",getName(),
                 "graphics",getGraphics(),
                 "directX",getDirectX(),
-                "processor",getProcessor()
+                "processor",getProcessor(),
+                "description",getDescription(),
+                "percent",getPercent(),
+                "imageURL",getImageURL()
         );
     }
 }
