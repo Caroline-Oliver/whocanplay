@@ -1,6 +1,15 @@
 package com.example.whocanplay;
 
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+
 import java.util.Map;
+@Getter
+@Setter
+@ToString(includeFieldNames = true)
+
+
 
 public class Game {
     private String name,graphics,directX,processor,description,percent,imageURL;
@@ -15,74 +24,8 @@ public class Game {
         this.setImageURL(imageURL);
     }
 
-    public String getName() {
-        return name;
-    }
 
-    public void setName(String name) {
-        this.name = name;
-    }
 
-    public String getGraphics() {
-        return graphics;
-    }
-
-    public void setGraphics(String graphics) {
-        this.graphics = graphics;
-    }
-
-    public String getDirectX() {
-        return directX;
-    }
-
-    public void setDirectX(String directX) {
-        this.directX = directX;
-    }
-
-    public String getProcessor() {
-        return processor;
-    }
-
-    public void setProcessor(String processor) {
-        this.processor = processor;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getPercent() {
-        return percent;
-    }
-
-    public void setPercent(String percent) {
-        this.percent = percent;
-    }
-
-    public String getImageURL() {
-        return imageURL;
-    }
-
-    public void setImageURL(String imageURL) {
-        this.imageURL = imageURL;
-    }
-
-    @Override
-    public String toString() {
-        return "Game{" +
-                "name='" + name + '\'' +
-                ", graphics='" + graphics + '\'' +
-                ", directX='" + directX + '\'' +
-                ", processor='" + processor + '\'' +
-                ", description='" + description + '\'' +
-                ", percent='" + percent + '\'' +
-                ", imageURL='" + imageURL + '\'' +
-                '}';
-    }
 
     public Map<String,String> getGameData(){
         return Map.of(
