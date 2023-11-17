@@ -5,10 +5,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Getter
 @Setter
@@ -18,22 +15,29 @@ import java.util.Map;
 public class LRUCache {
 
     private Integer size;
-    private Map<String,Map<String,String>> cacheValues;
-    private List<String> orderedListValues;
+    private Map<String,List<Map<String,String>>> cache;
 
     public LRUCache(){
         this.setSize(10);
-        this.setCacheValues(new HashMap<>(10));
-        this.setOrderedListValues(new LinkedList<>());
+        //The true here is toggled on because if it was false, it would go off of insertion order vs accessOrder which is what we want
+        this.setCache(new LinkedHashMap<>(size,0.75f,true){
+            protected boolean removeEldestEntry(Map.Entry eldest){
+                return size() > size;
+                }
+            }
+        );
     }
 
-    //Implement rest of cache methods
-    public void lruPut(String key,Map<String,String> value){
-       this.cacheValues.put(key,value);
+
+    public void lruPut(String key,List<Map<String,String>> value){
+       this.cache.put(key,value);
     }
 
-    public Map<String,String> lruGet(String key){
-        return cacheValues.getOrDefault(key,null);
+    public List<Map<String,String>> lruGet(String key){
+        return cache.getOrDefault(key,null);
+    }
+    public boolean lruContainsKey(String key){
+        return (cache.containsKey(key));
     }
 
 }

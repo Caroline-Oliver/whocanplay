@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /*
 
@@ -31,6 +32,10 @@ import java.util.*;
 public class WhocanplayController {
     //Autowire our class of our cache here
     private LRUCache lruCache;
+    private final String FORTNITEURL = "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcTegOws2NDAvoep6r9uCpF8ttSHdoZ8io4ZBNc1mOKxeqGklWG7";
+    private final String MINECRAFTURL = "https://www.minecraft.net/content/dam/games/minecraft/key-art/Games_Subnav_Minecraft-300x465.jpg";
+    private final String SISTERLOCATIONURL = "https://cdn.cloudflare.steamstatic.com/steam/apps/506610/header.jpg?t=1579635985";
+    private final String FALLGUYSURL = "https://upload.wikimedia.org/wikipedia/en/d/d4/Fall_Guys_Post_F2P_keyart.png";
 
     @Autowired
     public WhocanplayController(LRUCache lruCache){
@@ -45,46 +50,63 @@ public class WhocanplayController {
     //For this one, we want to add some parameters that will also have defaults associated with them
     //
     @GetMapping("/search")
-    public String search(
+    public List<Map<String,String>> search(
             @RequestParam(name = "searchArgs", required = false) String searchArgs
     ) throws JsonProcessingException {
-        if ( null == searchArgs || searchArgs.isEmpty()){
-            return "ERROR! Parameters required >:(";
-        }
-        Map<String,String> toInsrt = Map.of(
-                "name","Fortnie"
-        );
-        lruCache.lruPut("Test",toInsrt);
-        Map<String,String> result = lruCache.lruGet("Test");
-        System.out.printf("The result of the get of name is: %s%n",result.getOrDefault("name","ERROR"));
 
-        //Creates our object parser
+        //TODO: We need a data cleaning function to help with pre processing
+
+        //Checks if any args have been passed and if so, they are empty
+        if ( null == searchArgs || searchArgs.isEmpty()){
+            //TODO: Change this so that it makes a query to get everything
+            return null;
+        }
+
+        //FUNC: Creates our object parser
         ObjectMapper gameArgumentParser = new ObjectMapper();
-        //Parses out the serialized json string into our game arguments. These arguments will then be able to be sent into the sql request
+        //FUNC: Parses out the serialized json string into our game arguments. These arguments will then be able to be sent into the sql request
         Map<String,String> gameArguments = gameArgumentParser.readValue(searchArgs, new TypeReference<HashMap<String,String>>() {});
 
 
-        return gameArguments.getOrDefault("gameName","No Game Name provided:(");
+        //FUNC: This puts all of our map values into a string with spaces
+        String query = String.join(" ",gameArguments.values());
+
+        //FUNC: Check and see if requested query is already in our cache
+        if (lruCache.lruContainsKey(query)){
+            return lruCache.lruGet(query);
+        }
+        System.out.println("Query is:" + query);
+        //FUNC: If not, make request to SQL database
+        List<Map<String,String>> queryResults = this.makeSearchRequest(gameArguments);
+        lruCache.lruPut(query,queryResults);
+
+        return queryResults;
+
     }
 
     @GetMapping("/explore")
     public List<Map<String,String>> explore(){
-        String FortniteURL = "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcTegOws2NDAvoep6r9uCpF8ttSHdoZ8io4ZBNc1mOKxeqGklWG7";
-        String MinecarftURL = "https://www.minecraft.net/content/dam/games/minecraft/key-art/Games_Subnav_Minecraft-300x465.jpg";
-        String SisterLocationURL = "https://cdn.cloudflare.steamstatic.com/steam/apps/506610/header.jpg?t=1579635985";
-        String FallGuysURL = "https://upload.wikimedia.org/wikipedia/en/d/d4/Fall_Guys_Post_F2P_keyart.png";
+
+        //FIXME: Once we end up getting the request and everything working, we can then go back and do error checking such as nulls and stuff
+
+        return makeSearchRequest(null);
+    }
+
+
+    //TODO: This will make the request to the SQL Server
+    public List<Map<String,String>> makeSearchRequest(Map<String,String> args){
         List<Map<String,String>> games = new ArrayList<>();
-        for(int i = 0; i < 3;i++){
+        for(int i = 0; i < 4;i++){
             games.addAll(List.of(
                     new Game("Fortnite","GeForce GTX 6GB",
-                    "Version 12","4 hardware CPU Threads Intel Core i5 750 or higher", """
+                            "Version 12","4 hardware CPU Threads Intel Core i5 750 or higher", """
                             Explore large, destructible environments where no two games are ever the same. Team up with friends by sprinting, climbing and smashing your way to earn your Victory Royale, whether you choose to build up in Fortnite Battle Royale or go no-builds in Fortnite Zero Build.
                             Discover even more ways to play across thousands of creator-made game genres: adventure, roleplay, survival and more. Or, band together with up to three friends to fend off hordes of monsters in Save the World.
-                            ""","80%", FortniteURL).getGameData(),
+                            ""","80%", FORTNITEURL).getGameData(),
 
                     new Game("Minecraft","Geforce infinity",
                             "version 12","Intel core processor 502940","Minecraft is a game made up of blocks, creatures, and community. Blocks can be used to reshape the world or build fantastical creations. Creatures can be battled or befriended, depending on your playstyle. Experience epic adventures solo or with friends, there’s no wrong way to play.\n" +
-                            "Unless you’re digging straight down.","70%", MinecarftURL).getGameData(),
+                            "Unless you’re digging straight down.","70%", MINECRAFTURL).getGameData(),
 
                     new Game("Fall Guys","Xbox 360 or sum shit","Version 12",
                             "Intel Core process 45", """
@@ -92,17 +114,20 @@ public class WhocanplayController {
                             Create your own Course: Fall Guys Creative is a level editor that allows you to create fiendish custom Rounds and share them with the wider community.
                             Competitive & Cooperative: Tumble between competitive free-for-alls and cooperative challenges—or take on the Blunderdome with up to 3 friends!
                             Play with Friends: Fall Guys supports cross-play, cross-platform parties and cross-progression via your Epic Games Account.
-                            Ever-Evolving Content: Play stays fresh with new collabs and game updates which bring new Costumes, Obstacles, and ways to play.""","80%", FallGuysURL).getGameData(),
+                            Ever-Evolving Content: Play stays fresh with new collabs and game updates which bring new Costumes, Obstacles, and ways to play.""","80%", FALLGUYSURL).getGameData(),
 
                     new Game("Five Night's at Freddy's: Sister Location","GeForce GTX 6GB","Version 12",
                             "A random processor","Welcome to Circus Baby's Pizza World, where family fun " +
                             "and interactivity go beyond anything you've seen at those *other* pizza places! Now hiring: " +
                             "Late night technician. Must enjoy cramped spaces and be comfortable around active machinery. " +
-                            "Not responsible for death or dismemberment.","100%", SisterLocationURL).getGameData()
-                    ));
+                            "Not responsible for death or dismemberment.","100%", SISTERLOCATIONURL).getGameData()
+            ));
         }
 
-        
-        return games;
+
+        //PLAN: Add to check if we actually have arguments. If not, or they are blank, we return everything
+        return (null == args) ? games : games.stream()
+                .filter(obj-> obj.get("name").equalsIgnoreCase(args.get("name")))
+                .collect(Collectors.toList());
     }
 }
