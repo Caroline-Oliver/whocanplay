@@ -16,6 +16,7 @@ public class LRUCache {
 
     private Integer size;
     private Map<String,List<Map<String,String>>> cache;
+    private Map<String,List<String>> filters;
 
     public LRUCache(){
         this.setSize(10);
@@ -26,8 +27,10 @@ public class LRUCache {
                 }
             }
         );
+        this.filters = requestFilters();
     }
 
+    //The cache can keep track of the list of values by making an initial call to the database to check a set of all possible filters (AZ,ZA,processors,graphics)
 
     public void lruPut(String key,List<Map<String,String>> value){
        this.cache.put(key,value);
@@ -38,6 +41,21 @@ public class LRUCache {
     }
     public boolean lruContainsKey(String key){
         return (cache.containsKey(key));
+    }
+
+    private Map<String,List<String>> requestFilters(){
+        //TODO: We need an ordered list so that we can properly parse this stuff so that we can guarantee that a
+
+        //NOTE: These will of course be later replaced by a SQL query
+        List<String> graphicsList = List.of("GeForce GTX 6GB","Geforce infinity","Xbox 360 or sum shit");
+        List<String> processorList = List.of("Intel Core i5","Intel core processor 502940","Intel Core process 45","AMD Athlon");
+
+        return Map.of(
+                "Alphabetically", List.of("AZ","ZA"),
+                "processors",processorList,
+                "graphics",graphicsList
+        );
+
     }
 
 }

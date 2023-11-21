@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -53,36 +56,73 @@ public class WhocanplayController {
     //
     @GetMapping("/search")
     public List<Map<String,String>> search(
-            @RequestParam(name = "searchArgs", required = false) String searchArgs
+            @RequestParam(name = "filterArgs", required = false) String filterArgs,
+            @RequestParam(name = "gameName", required = false) String gameArg
     ) throws JsonProcessingException {
 
-        //TODO: We need a data cleaning function to help with pre processing
-
         //Checks if any args have been passed and if so, they are empty
-        if ( null == searchArgs || searchArgs.isEmpty()){
-            //TODO: Change this so that it makes a query to get everything
-            return null;
-        }
+
+        System.out.println((!filterArgs.isEmpty()) ? "Args for filter:" + filterArgs : "Empty args");
 
         //FUNC: Creates our object parser
         ObjectMapper gameArgumentParser = new ObjectMapper();
-        //FUNC: Parses out the serialized json string into our game arguments. These arguments will then be able to be sent into the sql request
-        Map<String,String> gameArguments = gameArgumentParser.readValue(searchArgs, new TypeReference<HashMap<String,String>>() {});
+        //Decodes the URL arguments passed
+        String decodedFilterArgs = URLDecoder.decode(filterArgs, StandardCharsets.UTF_8);
 
+        System.out.println(decodedFilterArgs);
+
+        //FUNC: Parses out the serialized json string into our game filters. These arguments will then be able to be sent into the sql request
+        TypeReference<Map<String,Set<String>>> filterTypeRef = new TypeReference<>(){};
+        Map<String,Set<String>> gameFilters = (null == filterArgs || filterArgs.isEmpty()) ? null : gameArgumentParser.readValue(decodedFilterArgs, filterTypeRef);
+
+
+
+        //FUNC: All this does is check if an empty string was passed in or something null
+        gameArg = (null == gameArg || gameArg.isEmpty()) ? null:gameArg;
+
+        System.out.println("All argumnets passed in:" + Objects.requireNonNullElse(gameArg, "NO GAME NAME PROVIDED!" + Objects.requireNonNullElse(gameFilters,"NO FILTERS PROVIDED")));
 
         //FUNC: This puts all of our map values into a string with spaces
-        String query = String.join(" ",gameArguments.values());
+        StringBuilder query = new StringBuilder();
+        //Checks if a game name exists and trims the game name to remove all leading and trailing spaces
+        if (null != gameArg) query.append(gameArg.trim());
+
+
+        //In order to make this work, we first have to be able to get the order of how everything will parse and we can work from there
+        lruCache.getFilters().forEach((k,v)->{
+            //This will then see if a key is contained and if it is, we will throw in all it's values
+            assert gameFilters != null;
+            if (gameFilters.containsKey(k)){
+                Set<String> gameFilter = gameFilters.get(k);
+                for (String filter : lruCache.getFilters().get(k)){
+                    if (gameFilter.contains(filter)){
+                        query.append(" ").append(filter);
+                    }
+                }
+            }
+        });
+
+        String queryValue = query.toString();
 
         //FUNC: Check and see if requested query is already in our cache
-        if (lruCache.lruContainsKey(query)){
-            return lruCache.lruGet(query);
-        }
-        System.out.println("Query is:" + query);
-        //FUNC: If not, make request to SQL database
-        List<Map<String,String>> queryResults = this.makeSearchRequest(gameArguments);
-        lruCache.lruPut(query,queryResults);
+        List<Map<String,String>> queryResult = lruCache.lruGet(queryValue);
 
-        return queryResults;
+        //If our query result was non-empty,return
+        if (null != queryResult){
+            return queryResult;
+        }
+
+
+        System.out.println("Query is: " + queryValue);
+        //FUNC: If not, make request to SQL database
+        //TODO: Fix the types that we pass in, but for now we will just return the basic type
+//        List<Map<String,String>> queryResults = this.makeSearchRequest(gameFilters);
+        List<Map<String,String>> queryResults = makeSearchRequest(null);
+        lruCache.lruPut(queryValue,queryResults);
+
+        //NOTE: Placeholder while we unfuck
+        return makeSearchRequest(null);
+
 
     }
 
@@ -144,16 +184,7 @@ public class WhocanplayController {
     @GetMapping("/filters")
     public Map<String,List<String>> Filters(){
 
-        //TODO: We need an ordered list so that we can properly parse this stuff so that we can guarantee that a
-
-        //NOTE: These will of course be later replaced by a SQL query
-        List<String> graphicsList = List.of("GeForce GTX 6GB","Geforce infinity","Xbox 360 or sum shit","GeForce GTX 6GB");
-        List<String> processorList = List.of("Intel Core i5","Intel core processor 502940","Intel Core process 45","AMD Athlon");
-
-        return Map.of(
-            "processors",processorList,
-                "graphics",graphicsList
-        );
+       return lruCache.getFilters();
 
     }
 }
