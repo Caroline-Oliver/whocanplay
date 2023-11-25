@@ -5,6 +5,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.stereotype.Service;
 
+import java.sql.*;
 import java.util.*;
 
 @Getter
@@ -13,6 +14,8 @@ import java.util.*;
 
 @Service
 public class LRUCache {
+    public static final String SQLUSERNAME = "springuser";
+    public static final String SQLPASSWORD = "#Kwanz9Laur3nCarolinEW3reHere";
 
     private Integer size;
     private Map<String,List<Map<String,String>>> cache;
@@ -43,19 +46,81 @@ public class LRUCache {
         return (cache.containsKey(key));
     }
 
+
+    //Now we need to grab our filters
     private Map<String,List<String>> requestFilters(){
-        //TODO: We need an ordered list so that we can properly parse this stuff so that we can guarantee that a
 
-        //NOTE: These will of course be later replaced by a SQL query
-        List<String> graphicsList = List.of("GeForce GTX 6GB","Geforce infinity","Xbox 360 or sum shit");
-        List<String> processorList = List.of("Intel Core i5","Intel core processor 502940","Intel Core process 45","AMD Athlon");
+        Connection connection = null;
 
-        return Map.of(
+
+        //Set up arraylists for the values
+        List<String> processorList = new ArrayList<>();
+        List<String>  graphicsList = new ArrayList<>();
+
+        //Map that we want to return
+        Map<String,List<String>> allFilters = Map.of(
                 "Alphabetically", List.of("AZ","ZA"),
-                "processors",processorList,
-                "graphics",graphicsList
+                "Processor",processorList,
+                "Gpu",graphicsList
         );
 
+        //For query parameters
+        List<List<String>> queryFilterParameters = List.of(
+                List.of("processor_name","Processor"),
+                List.of("gpu_name","Gpu")
+        );
+
+
+        String query = "SELECT %s from %s";
+
+        Statement stmt = null;
+        ResultSet rs = null;
+
+
+
+        try{
+            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/WHOCANPLAY",SQLUSERNAME,SQLPASSWORD);
+            stmt = connection.createStatement();
+
+            for (List<String> params: queryFilterParameters) {
+                rs = stmt.executeQuery(String.format(query,params.get(0), params.get(1)));
+                while (rs.next()) {
+                    allFilters.get(params.get(1)).add(rs.getString(1));
+                }
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            return null;
+        }
+        finally {
+            freeConnections(connection, stmt, rs);
+        }
+
+        System.out.println("All filters will be: " + allFilters);
+        return allFilters;
+    }
+
+    static void freeConnections(Connection connection, Statement stmt, ResultSet rs) {
+        if (rs != null) {
+            try {
+                rs.close();
+            } catch (SQLException ignored) { } // ignore
+            rs = null;
+        }
+        if (stmt != null) {
+            try {
+                stmt.close();
+            } catch (SQLException ignored) { } // ignore
+            stmt = null;
+        }
+        if (connection !=null){
+            try{
+                connection.close();
+            }catch(SQLException ignored) {}
+            connection = null;
+        }
     }
 
 }
+
+

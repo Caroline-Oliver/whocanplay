@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URLDecoder;
@@ -25,21 +26,21 @@ public class WhocanplayController {
 
     //Autowired variables
     private LRUCache lruCache;
-    private GameRepository gameRepository;
+
 
     private final String FORTNITEURL = "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcTegOws2NDAvoep6r9uCpF8ttSHdoZ8io4ZBNc1mOKxeqGklWG7";
     private final String MINECRAFTURL = "https://www.minecraft.net/content/dam/games/minecraft/key-art/Games_Subnav_Minecraft-300x465.jpg";
     private final String SISTERLOCATIONURL = "https://cdn.cloudflare.steamstatic.com/steam/apps/506610/header.jpg?t=1579635985";
     private final String FALLGUYSURL = "https://upload.wikimedia.org/wikipedia/en/d/d4/Fall_Guys_Post_F2P_keyart.png";
-    private final String SQLUSERNAME = "springuser";
-    private final String SQLPASSWORD = "#Kwanz9Laur3nCarolinEW3reHere";
+
 
     //Upon assignment, we need to make a request and get all of our possible parameters. This way we can just reference them
 
+
+
     @Autowired
-    public WhocanplayController(LRUCache lruCache, GameRepository gameRepository){
+    public WhocanplayController(LRUCache lruCache){
        this.setLruCache(lruCache);
-       this.setGameRepository(gameRepository);
    }
 
     @GetMapping("/")
@@ -124,7 +125,7 @@ public class WhocanplayController {
 
     @GetMapping("/explore")
     public List<Map<String,String>> explore(){
-
+        //NOTE: Playability is calculated by throwing in the gpu_id and it's vram. We will calculate this and add it to our map for each game that we will send
         //FIXME: Once we end up getting the request and everything working, we can then go back and do error checking such as nulls and stuff
         if (lruCache.lruContainsKey("")) return lruCache.lruGet("");
 
@@ -135,7 +136,7 @@ public class WhocanplayController {
     }
 
 
-    //TODO: This will make the request to the SQL Server
+    //TODO: We want to query by throwing in any sort of search parameters and then making the query and ordering it by plability
     public List<Map<String,String>> makeSearchRequest(Map<String,String> args){
         //NOTE: Basically all of this logic will eventually be replaced by the SQL
 
@@ -183,66 +184,7 @@ public class WhocanplayController {
     //FUNC: All this does is return the filters to the frontend
     @GetMapping("/filters")
     public Map<String,List<String>> Filters(){
-
        return lruCache.getFilters();
-    }
-
-//    @GetMapping("/test")
-//    public @ResponseBody Iterable<GameEntity>
-//    TestRoute(){
-//
-//        return gameRepository.findAll();
-//
-//
-//
-//    }
-
-
-    //NOTE: This worked, but needs to be heavily improved
-    @GetMapping("test")
-    public @ResponseBody Iterable<String> Test() throws SQLException {
-
-        Connection connection = null;
-        String query = "SELECT * FROM GameInfo";
-        Statement stmt = null;
-        ResultSet rs = null;
-
-        List<String> results = new ArrayList<>();
-
-        try{
-            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/WHOCANPLAY",SQLUSERNAME,SQLPASSWORD);
-
-            stmt = connection.createStatement();
-            rs = stmt.executeQuery(query);
-
-
-            while(rs.next()){
-                results.add(rs.getString(3));
-            }
-
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-            return null;
-        }
-        finally {
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException ignored) { } // ignore
-
-                rs = null;
-            }
-
-            if (stmt != null) {
-                try {
-                    stmt.close();
-                } catch (SQLException ignored) { } // ignore
-
-                stmt = null;
-            }
-        }
-        connection.close();
-        return results;
     }
 
 }

@@ -1,33 +1,25 @@
 package com.example.whocanplay;
 
-import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 @Getter
 @Setter
+@ToString()
 
-@Entity
-@Table(name = "GameInfo")
 public class GameEntity {
-
-
-//    @GeneratedValue(strategy = GenerationType.AUTO) I do not think this is needed as we will never insert into the table
-    @Id
-    @Column(name = "game_id")
-    private Integer id;
-
-    @Column(name="steam_game_id")
-    private Integer steamGameID;
-
-    @Column(name="game_name")
+    private Integer gameID,steamGameID,gpuID,vRAM;
     private String gameName;
 
-    @Column(name = "gpu_id")
-    private Integer gpuID;
-
-    @Column(name="vram")
-    private Integer vRAM;
+    public GameEntity(Integer gameID,Integer steamGameID,String gameName,Integer gpuID,Integer vRAM){
+        this.setGameID(gameID);
+        this.setSteamGameID(steamGameID);
+        this.setGameName(gameName);
+        this.setGpuID(gpuID);
+        this.setVRAM(vRAM);
+    }
 
 
 

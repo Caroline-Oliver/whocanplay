@@ -27,6 +27,7 @@ public class Game {
 
 
 
+
     public Map<String,String> getGameData(){
         return Map.of(
                 "name",getName(),
