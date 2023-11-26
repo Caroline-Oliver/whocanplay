@@ -51,9 +51,10 @@ public class WhocanplayController {
     //For this one, we want to add some parameters that will also have defaults associated with them
     //
     @GetMapping("/search")
-    public List<Map<String,String>> search(
+    public @ResponseBody List<Map<String,Object>> search(
             @RequestParam(name = "filterArgs", required = false) String filterArgs,
-            @RequestParam(name = "gameName", required = false) String gameArg
+            @RequestParam(name = "gameName", required = false) String gameArg,
+            @RequestParam(name="orderBy", defaultValue = "Highest") String orderBy
     ) throws JsonProcessingException {
 
         //Checks if any args have been passed and if so, they are empty
@@ -72,113 +73,79 @@ public class WhocanplayController {
         Map<String,Set<String>> gameFilters = (null == filterArgs || filterArgs.isEmpty()) ? null : gameArgumentParser.readValue(decodedFilterArgs, filterTypeRef);
 
 
-
-        //FUNC: All this does is check if an empty string was passed in or something null
-        gameArg = (null == gameArg || gameArg.isEmpty()) ? null:gameArg;
-
         System.out.println("All argumnets passed in:" + Objects.requireNonNullElse(gameArg, "NO GAME NAME PROVIDED!" + Objects.requireNonNullElse(gameFilters,"NO FILTERS PROVIDED")));
 
-        //FUNC: This puts all of our map values into a string with spaces
-        StringBuilder query = new StringBuilder();
-        //Checks if a game name exists and trims the game name to remove all leading and trailing spaces
-        if (null != gameArg) query.append(gameArg.trim());
 
-
-        //In order to make this work, we first have to be able to get the order of how everything will parse and we can work from there
-        lruCache.getFilters().forEach((k,v)->{
-            //This will then see if a key is contained and if it is, we will throw in all it's values
-            assert gameFilters != null;
-            if (gameFilters.containsKey(k)){
-                Set<String> gameFilter = gameFilters.get(k);
-                for (String filter : lruCache.getFilters().get(k)){
-                    if (gameFilter.contains(filter)){
-                        query.append(" ").append(filter);
-                    }
-                }
-            }
-        });
-
-        String queryValue = query.toString();
+        String query = buildQuery(gameArg,gameFilters,orderBy);
 
         //FUNC: Check and see if requested query is already in our cache
-        List<Map<String,String>> queryResult = lruCache.lruGet(queryValue);
-
-        //If our query result was non-empty,return
+        //FUNC If our query result was non-empty,return
+        List<Map<String,Object>> queryResult = lruCache.lruGet(query);
         if (null != queryResult){
             System.out.println("Already calculated!");
             return queryResult;
         }
 
+        System.out.println("Query is: " + query);
 
-        System.out.println("Query is: " + queryValue);
-        //FUNC: If not, make request to SQL database
-        //TODO: Fix the types that we pass in, but for now we will just return the basic type
-//        List<Map<String,String>> queryResults = this.makeSearchRequest(gameFilters);
-        List<Map<String,String>> queryResults = makeSearchRequest(null);
-        lruCache.lruPut(queryValue,queryResults);
+        List<Map<String,Object>> queryResults = makeSearchRequest(query);
+        lruCache.lruPut(query,queryResults);
 
-        //NOTE: Placeholder while we unfuck
-        return makeSearchRequest(null);
-
+        return queryResults;
 
     }
 
     @GetMapping("/explore")
-    public List<Map<String,String>> explore(){
-        //NOTE: Playability is calculated by throwing in the gpu_id and it's vram. We will calculate this and add it to our map for each game that we will send
+    public @ResponseBody List<Map<String,Object>> explore(){
         //FIXME: Once we end up getting the request and everything working, we can then go back and do error checking such as nulls and stuff
-        if (lruCache.lruContainsKey("")) return lruCache.lruGet("");
 
-        List<Map<String,String>> queryResults =  makeSearchRequest(null);
+        //FUNC This query will get all the games. From there, we will have the user filter out what they want to see
+        String query = "SELECT GameInfo.game_name AS gameName,Processor.processor_name AS processor, GPU.gpu_name AS gpu, GameInfo.game_description AS description, GameInfo.game_url as url, percentage_playable(GameInfo.gpu_id,GameInfo.vram) AS Percent FROM GameInfo INNER JOIN Gpu ON GameInfo.gpu_id = Gpu.gpu_id INNER JOIN Processor ON Processor.processor_id = GameInfo.processor_id ORDER BY percentage_playable(GameInfo.gpu_id,GameInfo.vram) DESC";
 
-        lruCache.lruPut("",queryResults);
+        if (lruCache.lruContainsKey(query)) return lruCache.lruGet(query);
+
+        List<Map<String,Object>> queryResults =  makeSearchRequest(query);
+
+        lruCache.lruPut(query,queryResults);
         return queryResults;
     }
 
 
     //TODO: We want to query by throwing in any sort of search parameters and then making the query and ordering it by plability
-    public List<Map<String,String>> makeSearchRequest(Map<String,String> args){
-        //NOTE: Basically all of this logic will eventually be replaced by the SQL
+    public List<Map<String,Object>> makeSearchRequest(String query){
 
-        List<Map<String,String>> games = new ArrayList<>();
-        for(int i = 0; i < 4;i++){
-            games.addAll(List.of(
-                    new Game("Fortnite","GeForce GTX 6GB",
-                            "Version 12","4 hardware CPU Threads Intel Core i5 750 or higher", """
-                            Explore large, destructible environments where no two games are ever the same. Team up with friends by sprinting, climbing and smashing your way to earn your Victory Royale, whether you choose to build up in Fortnite Battle Royale or go no-builds in Fortnite Zero Build.
-                            Discover even more ways to play across thousands of creator-made game genres: adventure, roleplay, survival and more. Or, band together with up to three friends to fend off hordes of monsters in Save the World.
-                            ""","80", FORTNITEURL).getGameData(),
+        Statement statement = null;
+        ResultSet resultSet = null;
+        Connection connection = null;
 
-                    new Game("Minecraft","Geforce infinity",
-                            "version 12","Intel core processor 502940","Minecraft is a game made up of blocks, creatures, and community. Blocks can be used to reshape the world or build fantastical creations. Creatures can be battled or befriended, depending on your playstyle. Experience epic adventures solo or with friends, there’s no wrong way to play.\n" +
-                            "Unless you’re digging straight down.","70", MINECRAFTURL).getGameData(),
+        List<Map<String,Object>> queryResults = new ArrayList<>();
 
-                    new Game("Fall Guys","Xbox 360 or sum shit","Version 12",
-                            "Intel Core process 45", """
-                            You’re invited to dive and dodge your way to victory in the pantheon of clumsy. Rookie or pro? Solo or partied up? Fall Guys delivers ever-evolving, high-concentrated hilarity and fun. Prefer to be the maverick behind the mayhem? Build your very own obstacle course to share with friends or the wider community.
-                            Create your own Course: Fall Guys Creative is a level editor that allows you to create fiendish custom Rounds and share them with the wider community.
-                            Competitive & Cooperative: Tumble between competitive free-for-alls and cooperative challenges—or take on the Blunderdome with up to 3 friends!
-                            Play with Friends: Fall Guys supports cross-play, cross-platform parties and cross-progression via your Epic Games Account.
-                            Ever-Evolving Content: Play stays fresh with new collabs and game updates which bring new Costumes, Obstacles, and ways to play.""","80", FALLGUYSURL).getGameData(),
+        try {
+            connection = DriverManager.getConnection(WhocanplayApplication.URL,WhocanplayApplication.SQLUSERNAME,WhocanplayApplication.SQLPASSWORD);
+            statement = connection.createStatement();
 
-                    new Game("Five Night's at Freddy's: Sister Location","GeForce GTX 6GB","Version 12",
-                            "AMD Athlon","Welcome to Circus Baby's Pizza World, where family fun " +
-                            "and interactivity go beyond anything you've seen at those *other* pizza places! Now hiring: " +
-                            "Late night technician. Must enjoy cramped spaces and be comfortable around active machinery. " +
-                            "Not responsible for death or dismemberment.","100", SISTERLOCATIONURL).getGameData()
-            ));
+            resultSet = statement.executeQuery(query);
+
+            while (resultSet.next()){
+                queryResults.add(
+                        Map.of(
+                                "gameName",resultSet.getString("gameName"),
+                                "processor",resultSet.getString("processor"),
+                                "gpu",resultSet.getString("gpu"),
+                                "description",resultSet.getString("description"),
+                                "url",resultSet.getString("url"),
+                                "percent",resultSet.getDouble("percent")
+                        )
+                );
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            return null;
         }
-        Game roblox = new Game("Roblox","GeForce GTX 6GB","Version 12",
-                "AMD Athlon","Roblox is an online game platform and game creation system developed " +
-                "by Roblox Corporation that allows users to program games and play games created by other users.","20",
-                "https://images.rbxcdn.com/c83761712c58384892d63501cad3a1ee");
-        games.add(roblox.getGameData());
-
-        //PLAN: Add to check if we actually have arguments. If not, or they are blank, we return everything
-
-        return (null == args) ? games : games.stream()
-                .filter(obj-> obj.get("name").equalsIgnoreCase(args.get("name")))
-                .collect(Collectors.toList());
+        finally {
+            LRUCache.freeConnections(connection,statement,resultSet);
+        }
+        return queryResults;
     }
 
     //FUNC: All this does is return the filters to the frontend
@@ -187,4 +154,79 @@ public class WhocanplayController {
        return lruCache.getFilters();
     }
 
+    public String buildQuery(String gameArg,Map<String,Set<String>> gameFilters,String orderBy){
+
+        //FUNC: Initialize query with the basic set up that each one will end up running
+        StringBuilder query = new StringBuilder("SELECT GameInfo.game_name AS gameName,Processor.processor_name AS processor, GPU.gpu_name AS gpu, GameInfo.game_description AS description, GameInfo.game_url as url, percentage_playable(GameInfo.gpu_id,GameInfo.vram) AS Percent FROM GameInfo INNER JOIN Processor ON GameInfo.processor_id = Processor.processor_id INNER JOIN Gpu ON GameInfo.gpu_id = Gpu.gpu_id");
+
+        //FUNC This where clauseAdded is needed in order to know if we need to append ANDS or not
+        boolean whereClauseAdded = false;
+
+        //FUNC Checks if a game name exists and trims the game name to remove all leading and trailing spaces
+        gameArg = (null == gameArg || gameArg.isEmpty()) ? null:gameArg;
+        if (null != gameArg){
+            query.append(" WHERE game_name LIKE '%").append(gameArg.trim()).append("%'");
+            whereClauseAdded = true;
+        }
+
+        // FUNC This gets all of the key names and their respective columns as we have no other way of knowing these
+        Map<String,String> filterColumns = Map.of(
+                "Processor","Processor.processor_name",
+                "Gpu","GPU.gpu_name"
+        );
+
+        //This will loop through all of our possible filters in a specific order for caching purposes
+        //NOTE: Test to see if it is even worth it to cache all of this in terms of speed
+
+        for(Map.Entry<String,List<String>> entry: lruCache.getFilters().entrySet()){
+            String k = entry.getKey();
+            System.out.println("Key is:"+k);
+            List<String> v = entry.getValue();
+            if (gameFilters.containsKey(k)){
+                if (Objects.equals(k, "Playability")){
+                    System.out.println("Acknowledged, but skipping");
+                    continue;
+                }
+                if (whereClauseAdded){
+                    query.append(" AND");
+                }
+                else{
+                    query.append(" WHERE");
+                    whereClauseAdded = true;
+                }
+                Set<String> gameFilter = gameFilters.get(k);
+                boolean addOrClause = false;
+
+                for (String filter : lruCache.getFilters().get(k)){
+                    if (gameFilter.contains(filter)){
+                        if (addOrClause){
+                            query.append(" OR ")
+                                    .append(filterColumns.get(k))
+                                    .append("='")
+                                    .append(filter)
+                                    .append("'");
+                        }
+                        else{
+                            query.append(" ")
+                                    .append(filterColumns.get(k))
+                                    .append("='")
+                                    .append(filter)
+                                    .append("'");
+                            addOrClause = true;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        //FUNC We will finally append the order by clause by using our key to get our string for the order by clause which is already created in our lrucahce
+
+        query.append(" ");
+        query.append(lruCache.getPlayabilityMap().get(orderBy));
+
+
+        return query.toString();
+    }
 }
+

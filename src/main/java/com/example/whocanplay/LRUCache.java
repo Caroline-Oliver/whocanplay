@@ -14,13 +14,12 @@ import java.util.*;
 
 @Service
 public class LRUCache {
-    public static final String SQLUSERNAME = "springuser";
-    public static final String SQLPASSWORD = "#Kwanz9Laur3nCarolinEW3reHere";
+
 
     private Integer size;
-    private Map<String,List<Map<String,String>>> cache;
+    private Map<String,List<Map<String,Object>>> cache;
     private Map<String,List<String>> filters;
-
+    private Map<String,String> playabilityMap;
     public LRUCache(){
         this.setSize(10);
         //The true here is toggled on because if it was false, it would go off of insertion order vs accessOrder which is what we want
@@ -31,15 +30,21 @@ public class LRUCache {
             }
         );
         this.filters = requestFilters();
+        this.playabilityMap = Map.of(
+                "Highest","ORDER BY percentage_playable(GameInfo.gpu_id,GameInfo.vram) DESC",
+                "Lowest","ORDER BY percentage_playable(GameInfo.gpu_id,GameInfo.vram) ASC",
+                "A-Z","ORDER BY GameInfo.game_name ASC",
+                "Z-A","ORDER BY GameInfo.game_name DESC"
+        );
     }
 
     //The cache can keep track of the list of values by making an initial call to the database to check a set of all possible filters (AZ,ZA,processors,graphics)
 
-    public void lruPut(String key,List<Map<String,String>> value){
+    public void lruPut(String key,List<Map<String,Object>> value){
        this.cache.put(key,value);
     }
 
-    public List<Map<String,String>> lruGet(String key){
+    public List<Map<String,Object>> lruGet(String key){
         return cache.getOrDefault(key,null);
     }
     public boolean lruContainsKey(String key){
@@ -59,7 +64,7 @@ public class LRUCache {
 
         //Map that we want to return
         Map<String,List<String>> allFilters = Map.of(
-                "Alphabetically", List.of("AZ","ZA"),
+                "Playability", List.of("Highest","Lowest","Ascending","Descending"),
                 "Processor",processorList,
                 "Gpu",graphicsList
         );
@@ -77,9 +82,8 @@ public class LRUCache {
         ResultSet rs = null;
 
 
-
         try{
-            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/WHOCANPLAY",SQLUSERNAME,SQLPASSWORD);
+            connection = DriverManager.getConnection(WhocanplayApplication.URL,WhocanplayApplication.SQLUSERNAME,WhocanplayApplication.SQLPASSWORD);
             stmt = connection.createStatement();
 
             for (List<String> params: queryFilterParameters) {
