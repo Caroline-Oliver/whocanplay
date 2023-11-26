@@ -54,26 +54,22 @@ public class WhocanplayController {
     public @ResponseBody List<Map<String,Object>> search(
             @RequestParam(name = "filterArgs", required = false) String filterArgs,
             @RequestParam(name = "gameName", required = false) String gameArg,
-            @RequestParam(name="orderBy", defaultValue = "Highest") String orderBy
+            @RequestParam(name="orderBy", defaultValue = "Playability: Highest") String orderBy
     ) throws JsonProcessingException {
 
         //Checks if any args have been passed and if so, they are empty
-
-        System.out.println((!filterArgs.isEmpty()) ? "Args for filter:" + filterArgs : "Empty args");
 
         //FUNC: Creates our object parser
         ObjectMapper gameArgumentParser = new ObjectMapper();
         //Decodes the URL arguments passed
         String decodedFilterArgs = URLDecoder.decode(filterArgs, StandardCharsets.UTF_8);
 
-        System.out.println(decodedFilterArgs);
-
         //FUNC: Parses out the serialized json string into our game filters. These arguments will then be able to be sent into the sql request
         TypeReference<Map<String,Set<String>>> filterTypeRef = new TypeReference<>(){};
         Map<String,Set<String>> gameFilters = (null == filterArgs || filterArgs.isEmpty()) ? null : gameArgumentParser.readValue(decodedFilterArgs, filterTypeRef);
 
 
-        System.out.println("All argumnets passed in:" + Objects.requireNonNullElse(gameArg, "NO GAME NAME PROVIDED!" + Objects.requireNonNullElse(gameFilters,"NO FILTERS PROVIDED")));
+        System.out.println("All argumnets passed in:" +gameArg + orderBy +gameFilters);
 
 
         String query = buildQuery(gameArg,gameFilters,orderBy);

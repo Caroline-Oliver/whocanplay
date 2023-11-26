@@ -31,10 +31,10 @@ public class LRUCache {
         );
         this.filters = requestFilters();
         this.playabilityMap = Map.of(
-                "Highest","ORDER BY percentage_playable(GameInfo.gpu_id,GameInfo.vram) DESC",
-                "Lowest","ORDER BY percentage_playable(GameInfo.gpu_id,GameInfo.vram) ASC",
-                "A-Z","ORDER BY GameInfo.game_name ASC",
-                "Z-A","ORDER BY GameInfo.game_name DESC"
+                "Playability: Highest","ORDER BY percentage_playable(GameInfo.gpu_id,GameInfo.vram) DESC",
+                "Playability: Lowest","ORDER BY percentage_playable(GameInfo.gpu_id,GameInfo.vram) ASC",
+                "Alphabetically: A-Z","ORDER BY GameInfo.game_name ASC",
+                "Alphabetically: Z-A","ORDER BY GameInfo.game_name DESC"
         );
     }
 
@@ -64,7 +64,7 @@ public class LRUCache {
 
         //Map that we want to return
         Map<String,List<String>> allFilters = Map.of(
-                "Playability", List.of("Highest","Lowest","Ascending","Descending"),
+                "Playability", List.of("Playability: Highest","Playability: Lowest","Alphabetically: A-Z","Alphabetically: Z-A"),
                 "Processor",processorList,
                 "Gpu",graphicsList
         );
