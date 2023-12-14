@@ -76,7 +76,7 @@ public class LRUCache {
         );
 
 
-        String query = "SELECT %s from %s";
+        String query = "SELECT %s,COUNT(GameInfo.%s_id) AS occ FROM %s,GameInfo WHERE %s.%s_id = GameInfo.%s_id GROUP BY %s.%s_id ORDER BY occ desc";
 
         Statement stmt = null;
         ResultSet rs = null;
@@ -87,7 +87,10 @@ public class LRUCache {
             stmt = connection.createStatement();
 
             for (List<String> params: queryFilterParameters) {
-                rs = stmt.executeQuery(String.format(query,params.get(0), params.get(1)));
+                String formattedQuery = String.format(query,params.get(0),params.get(1),params.get(1),params.get(1),params.get(1),params.get(1),params.get(1),params.get(1));
+                System.out.println(formattedQuery);
+
+                rs = stmt.executeQuery(formattedQuery);
                 while (rs.next()) {
                     allFilters.get(params.get(1)).add(rs.getString(1));
                 }

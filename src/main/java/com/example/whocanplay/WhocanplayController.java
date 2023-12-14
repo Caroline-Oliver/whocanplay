@@ -49,7 +49,7 @@ public class WhocanplayController {
     }
 
     //For this one, we want to add some parameters that will also have defaults associated with them
-    //
+    //NOTE: Could create defaults for filterArgs and gameName just to be on the safe side to not worry about nulls
     @GetMapping("/search")
     public @ResponseBody List<Map<String,Object>> search(
             @RequestParam(name = "filterArgs", required = false) String filterArgs,
@@ -61,8 +61,8 @@ public class WhocanplayController {
 
         //FUNC: Creates our object parser
         ObjectMapper gameArgumentParser = new ObjectMapper();
-        //Decodes the URL arguments passed
-        String decodedFilterArgs = URLDecoder.decode(filterArgs, StandardCharsets.UTF_8);
+        //Decodes the URL arguments passed or returns null if not passed
+        String decodedFilterArgs = (null == filterArgs || filterArgs.isEmpty())  ? null : URLDecoder.decode(filterArgs, StandardCharsets.UTF_8);
 
         //FUNC: Parses out the serialized json string into our game filters. These arguments will then be able to be sent into the sql request
         TypeReference<Map<String,Set<String>>> filterTypeRef = new TypeReference<>(){};
@@ -160,9 +160,15 @@ public class WhocanplayController {
 
         //FUNC Checks if a game name exists and trims the game name to remove all leading and trailing spaces
         gameArg = (null == gameArg || gameArg.isEmpty()) ? null:gameArg;
+        //FUNC: Pre-process this for any sort of spaces and replaces any non-character with a dot for regex purposes
         if (null != gameArg){
-            query.append(" WHERE game_name LIKE '%").append(gameArg.trim()).append("%'");
+            String gameArgProcessed = gameArg.trim().chars()
+                    .mapToObj(ch-> Character.isLetter(ch) ? (char)ch : (char)'.')
+                    .collect(StringBuilder::new,StringBuilder::append,StringBuilder::append)
+                    .toString();
+            query.append(" WHERE game_name REGEXP '").append(gameArgProcessed).append("'");
             whereClauseAdded = true;
+            System.out.println("Processed gameArg: " + gameArgProcessed);
         }
 
         // FUNC This gets all of the key names and their respective columns as we have no other way of knowing these
@@ -173,53 +179,52 @@ public class WhocanplayController {
 
         //This will loop through all of our possible filters in a specific order for caching purposes
         //NOTE: Test to see if it is even worth it to cache all of this in terms of speed
+        if (gameFilters != null){
+            for(Map.Entry<String,List<String>> entry: lruCache.getFilters().entrySet()){
+                String k = entry.getKey();
+                List<String> v = entry.getValue();
+                if (gameFilters.containsKey(k)){
+                    if (Objects.equals(k, "Playability")){
+                        System.out.println("Acknowledged, but skipping");
+                        continue;
+                    }
+                    if (whereClauseAdded){
+                        query.append(" AND");
+                    }
+                    else{
+                        query.append(" WHERE");
+                        whereClauseAdded = true;
+                    }
+                    Set<String> gameFilter = gameFilters.get(k);
+                    boolean addOrClause = false;
 
-        for(Map.Entry<String,List<String>> entry: lruCache.getFilters().entrySet()){
-            String k = entry.getKey();
-            System.out.println("Key is:"+k);
-            List<String> v = entry.getValue();
-            if (gameFilters.containsKey(k)){
-                if (Objects.equals(k, "Playability")){
-                    System.out.println("Acknowledged, but skipping");
-                    continue;
-                }
-                if (whereClauseAdded){
-                    query.append(" AND");
-                }
-                else{
-                    query.append(" WHERE");
-                    whereClauseAdded = true;
-                }
-                Set<String> gameFilter = gameFilters.get(k);
-                boolean addOrClause = false;
-
-                for (String filter : lruCache.getFilters().get(k)){
-                    if (gameFilter.contains(filter)){
-                        if (addOrClause){
-                            query.append(" OR ")
-                                    .append(filterColumns.get(k))
-                                    .append("='")
-                                    .append(filter)
-                                    .append("'");
-                        }
-                        else{
-                            query.append(" ")
-                                    .append(filterColumns.get(k))
-                                    .append("='")
-                                    .append(filter)
-                                    .append("'");
-                            addOrClause = true;
+                    for (String filter : lruCache.getFilters().get(k)){
+                        if (gameFilter.contains(filter)){
+                            if (addOrClause){
+                                query.append(" OR ")
+                                        .append(filterColumns.get(k))
+                                        .append("='")
+                                        .append(filter)
+                                        .append("'");
+                            }
+                            else{
+                                query.append(" ")
+                                        .append(filterColumns.get(k))
+                                        .append("='")
+                                        .append(filter)
+                                        .append("'");
+                                addOrClause = true;
+                            }
                         }
                     }
                 }
             }
         }
 
-
         //FUNC We will finally append the order by clause by using our key to get our string for the order by clause which is already created in our lrucahce
 
         query.append(" ");
-        query.append(lruCache.getPlayabilityMap().get(orderBy));
+        query.append(lruCache.getPlayabilityMap().getOrDefault(orderBy,"Playability: Highest"));
 
 
         return query.toString();
